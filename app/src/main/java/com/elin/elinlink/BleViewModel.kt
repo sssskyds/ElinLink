@@ -35,6 +35,9 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         val NUS_RX: UUID = UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E") // write (phone -> device)
         val NUS_TX: UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E") // notify (device -> phone)
         val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        // Standard Generic Access service + Device Name characteristic
+        val GAP_SERVICE: UUID = UUID.fromString("00001800-0000-1000-8000-00805f9b34fb")
+        val GAP_DEVICE_NAME: UUID = UUID.fromString("00002A00-0000-1000-8000-00805f9b34fb")
         private const val UNKNOWN = "Unknown device"
         private const val SCAN_PERIOD_MS = 12_000L
     }
@@ -65,6 +68,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
+    private var pendingNotify: BluetoothGattCharacteristic? = null
     private var scanning = false
 
     fun isBluetoothOn(): Boolean = btAdapter?.isEnabled == true
@@ -84,8 +88,8 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         else true
 
     /**
-     * Resolve the best available device name.
-     * 1) The name advertised in the scan record (available without BLUETOOTH_CONNECT).
+     * Resolve the best available name from a scan result.
+     * 1) Name advertised in the scan record (available without BLUETOOTH_CONNECT).
      * 2) BluetoothDevice.name (needs BLUETOOTH_CONNECT on Android 12+, often null while scanning).
      * Returns null when no real name is available so callers can keep a previously resolved one.
      */
@@ -183,10 +187,49 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         }
         gatt = null
         writeChar = null
+        pendingNotify = null
         if (_state.value == ConnState.CONNECTED || _state.value == ConnState.CONNECTING) {
             _state.value = ConnState.DISCONNECTED
         }
         _connectedName.value = null
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun enableNotifications(g: BluetoothGatt) {
+        val notifyChar = pendingNotify ?: return
+        g.setCharacteristicNotification(notifyChar, true)
+        val cccd = notifyChar.getDescriptor(CCCD)
+        if (cccd != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+            } else {
+                @Suppress("DEPRECATION")
+                cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+                @Suppress("DEPRECATION")
+                g.writeDescriptor(cccd)
+            }
+        }
+        appendLog(">> Ready. Notifications enabled.")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun initialConnectedName(g: BluetoothGatt): String {
+        val cached = _devices.value.firstOrNull { it.address == g.device.address }
+            ?.name?.takeIf { it != UNKNOWN && it.isNotBlank() }
+        val gattName = if (hasConnectPerm()) g.device.name?.trim()?.takeIf { it.isNotEmpty() } else null
+        return cached ?: gattName ?: g.device.address
+    }
+
+    private fun applyResolvedName(g: BluetoothGatt, name: String) {
+        _connectedName.value = name
+        val addr = g.device.address
+        val list = _devices.value.toMutableList()
+        val idx = list.indexOfFirst { it.address == addr }
+        if (idx >= 0) {
+            list[idx] = list[idx].copy(name = name)
+            _devices.value = list
+        }
+        appendLog(">> Device name: $name")
     }
 
     private val gattCallback = object : BluetoothGattCallback() {
@@ -202,6 +245,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
                     _state.value = ConnState.DISCONNECTED
                     _connectedName.value = null
                     writeChar = null
+                    pendingNotify = null
                     try { g.close() } catch (_: Exception) {}
                     if (gatt == g) gatt = null
                 }
@@ -221,28 +265,55 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
                 return
             }
             writeChar = service.getCharacteristic(NUS_RX)
-            val notifyChar = service.getCharacteristic(NUS_TX)
-
-            if (notifyChar != null) {
-                g.setCharacteristicNotification(notifyChar, true)
-                val cccd = notifyChar.getDescriptor(CCCD)
-                if (cccd != null) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-                        @Suppress("DEPRECATION")
-                        g.writeDescriptor(cccd)
-                    }
-                }
-            }
+            pendingNotify = service.getCharacteristic(NUS_TX)
             _state.value = ConnState.CONNECTED
-            val cachedName = _devices.value.firstOrNull { it.address == g.device.address }
-                ?.name?.takeIf { it != UNKNOWN && it.isNotBlank() }
-            val gattName = if (hasConnectPerm()) g.device.name?.trim()?.takeIf { it.isNotEmpty() } else null
-            _connectedName.value = cachedName ?: gattName ?: g.device.address
-            appendLog(">> Ready. Notifications enabled.")
+            _connectedName.value = initialConnectedName(g)
+
+            // If the device exposes the standard Device Name characteristic, read it so
+            // peripherals that don't advertise a name still show a real name.
+            val gapName = g.getService(GAP_SERVICE)?.getCharacteristic(GAP_DEVICE_NAME)
+            if (gapName != null) {
+                // Read first; notifications are enabled in onCharacteristicRead so the
+                // two GATT operations are serialized (Android allows only one at a time).
+                g.readCharacteristic(gapName)
+            } else {
+                enableNotifications(g)
+            }
+        }
+
+        // Android 13+
+        override fun onCharacteristicRead(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            value: ByteArray,
+            status: Int
+        ) {
+            if (characteristic.uuid == GAP_DEVICE_NAME) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    val n = value.toString(Charsets.UTF_8).trim()
+                    if (n.isNotEmpty()) applyResolvedName(g, n)
+                }
+                enableNotifications(g)
+            }
+        }
+
+        // Android <= 12
+        @Suppress("DEPRECATION")
+        @Deprecated("Deprecated in API 33")
+        override fun onCharacteristicRead(
+            g: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int
+        ) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU &&
+                characteristic.uuid == GAP_DEVICE_NAME
+            ) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    val n = characteristic.value?.toString(Charsets.UTF_8)?.trim()
+                    if (!n.isNullOrEmpty()) applyResolvedName(g, n)
+                }
+                enableNotifications(g)
+            }
         }
 
         // Android 13+
