@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple white "E" mark inside the adaptive-icon safe zone -->
+    <path android:fillColor="#FFFFFF" android:pathData="M42,36 h8 v36 h-8 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M42,36 h24 v8 h-24 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M42,50 h20 v8 h-20 z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M42,64 h24 v8 h-24 z" />
+</vector>
