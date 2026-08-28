@@ -35,6 +35,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         val NUS_RX: UUID = UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E") // write (phone -> device)
         val NUS_TX: UUID = UUID.fromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E") // notify (device -> phone)
         val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
+        private const val UNKNOWN = "Unknown device"
         private const val SCAN_PERIOD_MS = 12_000L
     }
 
@@ -82,6 +83,23 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
                 PackageManager.PERMISSION_GRANTED
         else true
 
+    /**
+     * Resolve the best available device name.
+     * 1) The name advertised in the scan record (available without BLUETOOTH_CONNECT).
+     * 2) BluetoothDevice.name (needs BLUETOOTH_CONNECT on Android 12+, often null while scanning).
+     * Returns null when no real name is available so callers can keep a previously resolved one.
+     */
+    @SuppressLint("MissingPermission")
+    private fun resolveName(result: ScanResult, dev: BluetoothDevice): String? {
+        val advName = result.scanRecord?.deviceName?.trim()
+        if (!advName.isNullOrEmpty()) return advName
+        if (hasConnectPerm()) {
+            val n = dev.name?.trim()
+            if (!n.isNullOrEmpty()) return n
+        }
+        return null
+    }
+
     // ---------- Scanning ----------
     @SuppressLint("MissingPermission")
     fun startScan() {
@@ -94,8 +112,10 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         scanning = true
         _state.value = ConnState.SCANNING
 
+        // Active scan (LOW_LATENCY) so scan responses carrying the device name are received.
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             .build()
 
         scanner.startScan(null, settings, scanCallback)
@@ -116,15 +136,22 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             val dev = result.device ?: return
-            val name = if (hasConnectPerm()) (dev.name ?: "Unknown device") else "Unknown device"
+            val resolvedName = resolveName(result, dev)
             val existing = _devices.value.toMutableList()
             val idx = existing.indexOfFirst { it.address == dev.address }
             if (idx >= 0) {
-                existing[idx] = existing[idx].copy(rssi = result.rssi, name = name)
+                // Keep a name we already resolved if this packet has none.
+                val current = existing[idx]
+                val keptName = resolvedName ?: current.name
+                existing[idx] = current.copy(rssi = result.rssi, name = keptName)
             } else {
-                existing.add(ScannedDevice(dev, name, dev.address, result.rssi))
+                existing.add(ScannedDevice(dev, resolvedName ?: UNKNOWN, dev.address, result.rssi))
             }
             _devices.value = existing.sortedByDescending { it.rssi }
+        }
+
+        override fun onBatchScanResults(results: MutableList<ScanResult>) {
+            results.forEach { onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, it) }
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -211,8 +238,10 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             _state.value = ConnState.CONNECTED
-            _connectedName.value = _devices.value.firstOrNull { it.address == g.device.address }?.name
-                ?: (if (hasConnectPerm()) g.device.name else null) ?: g.device.address
+            val cachedName = _devices.value.firstOrNull { it.address == g.device.address }
+                ?.name?.takeIf { it != UNKNOWN && it.isNotBlank() }
+            val gattName = if (hasConnectPerm()) g.device.name?.trim()?.takeIf { it.isNotEmpty() } else null
+            _connectedName.value = cachedName ?: gattName ?: g.device.address
             appendLog(">> Ready. Notifications enabled.")
         }
 
