@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Elin-Link</string>
+    <string name="scan">Scan</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="send">Send</string>
+    <string name="clear">Clear</string>
+    <string name="devices">Devices</string>
+    <string name="serial_log">Serial Log</string>
+    <string name="command_hint">Type a command\u2026</string>
+    <string name="connected_to">Connected to %1$s</string>
+    <string name="status_idle">Status: Idle</string>
+    <string name="status_scanning">Status: Scanning\u2026</string>
+    <string name="status_connecting">Status: Connecting\u2026</string>
+    <string name="status_connected">Status: Connected</string>
+    <string name="status_disconnected">Status: Disconnected</string>
+</resources>
