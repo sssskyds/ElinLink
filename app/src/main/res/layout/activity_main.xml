@@ -89,17 +89,39 @@
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:background="@color/brand"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="2dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
+                android:paddingStart="8dp"
+                android:paddingEnd="0dp"
                 android:textStyle="bold"
                 android:textSize="18sp"
                 android:textColor="@color/white"
                 android:text="@string/dashboard" />
+
+            <ImageButton
+                android:id="@+id/btnHelp"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_help"
+                android:contentDescription="@string/help" />
+
+            <ImageButton
+                android:id="@+id/btnTheme"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:padding="9dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_theme_moon"
+                android:contentDescription="@string/theme" />
 
             <Button
                 android:id="@+id/btnToggleControls"
@@ -177,14 +199,6 @@
                         android:layout_marginStart="8dp"
                         android:text="@string/disconnect" />
                 </LinearLayout>
-
-                <Button
-                    android:id="@+id/btnTheme"
-                    style="?attr/borderlessButtonStyle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="@string/theme" />
             </LinearLayout>
 
             <ScrollView
