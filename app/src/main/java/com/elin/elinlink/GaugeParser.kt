@@ -5,7 +5,7 @@ object GaugeParser {
 
     /**
      * Parse a line of hex byte tokens delimited by comma or whitespace.
-     * Examples: "1A, 2B FF", "0x1A 0x2B", "1a2b" (single token -> one byte).
+     * Examples: "1A, 2B FF", "0x1A 0x2B", "1a2b" (single token maps to one byte).
      * Returns null if any token is not a valid 0..255 hex byte.
      */
     fun parseHex(line: String): ByteArray? {
@@ -22,8 +22,8 @@ object GaugeParser {
     }
 
     /**
-     * Extract an unsigned integer from bit [start..end] inclusive, MSB-first
-     * across the byte stream (bit 0 = most-significant bit of byte 0).
+     * Extract an unsigned integer from the inclusive bit range bitStart..bitEnd,
+     * MSB-first across the byte stream (bit 0 = most-significant bit of byte 0).
      */
     fun extractBits(frame: ByteArray, bitStart: Int, bitEnd: Int): Long {
         val start = minOf(bitStart, bitEnd).coerceAtLeast(0)
