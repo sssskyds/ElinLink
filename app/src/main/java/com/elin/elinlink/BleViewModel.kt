@@ -33,7 +33,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         // Bump this on every change so you can confirm the phone runs the latest build.
-        const val BUILD_TAG = "rev14 - dark red launcher icon + icon theme toggle & help (2026-08-31)"
+        const val BUILD_TAG = "rev15 - send controls: slider + switch output frame (2026-08-31)"
 
         // Nordic UART Service (NUS)
         val NUS_SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
@@ -47,6 +47,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         private const val SCAN_PERIOD_MS = 12_000L
         private const val PREFS = "elinlink_gauges"
         private const val KEY_CONFIGS = "configs"
+        private const val KEY_CONTROLS = "controls"
     }
 
     private val appCtx get() = getApplication<Application>()
@@ -82,6 +83,13 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
     private val _frame = MutableStateFlow<ByteArray?>(null)
     val frame: StateFlow<ByteArray?> = _frame.asStateFlow()
 
+    // ---- Output control state (slider / switch senders) ----
+    private val _controls = MutableStateFlow<List<ControlConfig>>(emptyList())
+    val controls: StateFlow<List<ControlConfig>> = _controls.asStateFlow()
+
+    // Current raw value per control id (kept in the ViewModel so it survives rotation).
+    private val controlValues = HashMap<String, Long>()
+
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
     private var pendingNotify: BluetoothGattCharacteristic? = null
@@ -91,6 +99,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         // Printed as the first line of the log so you can confirm which build is running.
         appendLog(">> Elin-Link $BUILD_TAG")
         loadGauges()
+        loadControls()
     }
 
     fun isBluetoothOn(): Boolean = btAdapter?.isEnabled == true
@@ -127,6 +136,66 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         val arr = JSONArray()
         _gauges.value.forEach { arr.put(it.toJson()) }
         prefs.edit().putString(KEY_CONFIGS, arr.toString()).apply()
+    }
+
+    // ---------- Output controls (slider / switch senders) ----------
+    fun addControl(config: ControlConfig) {
+        _controls.value = _controls.value + config
+        saveControls()
+    }
+
+    fun updateControl(config: ControlConfig) {
+        _controls.value = _controls.value.map { if (it.id == config.id) config else it }
+        saveControls()
+        sendControlFrame()
+    }
+
+    fun removeControl(id: String) {
+        _controls.value = _controls.value.filterNot { it.id == id }
+        controlValues.remove(id)
+        saveControls()
+    }
+
+    fun currentControlValue(id: String): Long = controlValues[id] ?: 0L
+
+    /** Update one control's value and transmit the recomposed frame. */
+    fun setControlValue(id: String, raw: Long) {
+        controlValues[id] = raw
+        sendControlFrame()
+    }
+
+    /**
+     * Compose the outgoing byte frame from every control's current value and
+     * send it as comma-separated hex bytes, e.g. "0xD0, 0xD1, 0xD2".
+     * Silently does nothing while disconnected so dragging a slider offline
+     * does not spam "Not connected" toasts.
+     */
+    fun sendControlFrame() {
+        val list = _controls.value
+        if (list.isEmpty()) return
+        val frame = ControlFrame.compose(list, controlValues)
+        if (frame.isEmpty()) return
+        val hex = ControlFrame.toHex(frame)
+        if (gatt == null || writeChar == null || _state.value != ConnState.CONNECTED) return
+        if (performWrite(hex)) appendLog("TX: $hex") else appendLog(">> Write failed")
+    }
+
+    private fun loadControls() {
+        try {
+            val raw = prefs.getString(KEY_CONTROLS, "[]") ?: "[]"
+            val arr = JSONArray(raw)
+            val list = ArrayList<ControlConfig>(arr.length())
+            for (i in 0 until arr.length()) list.add(ControlConfig.fromJson(arr.getJSONObject(i)))
+            _controls.value = list
+        } catch (_: Exception) {
+            _controls.value = emptyList()
+        }
+    }
+
+    private fun saveControls() {
+        val arr = JSONArray()
+        _controls.value.forEach { arr.put(it.toJson()) }
+        prefs.edit().putString(KEY_CONTROLS, arr.toString()).apply()
     }
 
     /** Log incoming serial text and, if it is a hex frame, update the gauge data frame. */
@@ -448,20 +517,18 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---------- Writing ----------
+    /** Perform the low-level GATT write of [text] + CRLF. Assumes connection was checked. */
     @SuppressLint("MissingPermission")
-    fun send(text: String) {
-        val g = gatt
-        val ch = writeChar
-        if (g == null || ch == null || _state.value != ConnState.CONNECTED) {
-            _toast.value = "Not connected"; return
-        }
+    private fun performWrite(text: String): Boolean {
+        val g = gatt ?: return false
+        val ch = writeChar ?: return false
         val payload = (text + "\r\n").toByteArray(Charsets.UTF_8)
         val props = ch.properties
         val writeType = if (props and BluetoothGattCharacteristic.PROPERTY_WRITE != 0)
             BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         else
             BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             g.writeCharacteristic(ch, payload, writeType) == BluetoothGatt.GATT_SUCCESS
         } else {
             @Suppress("DEPRECATION")
@@ -471,7 +538,13 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
                 g.writeCharacteristic(ch)
             }
         }
-        if (ok) appendLog("TX: $text") else appendLog(">> Write failed")
+    }
+
+    fun send(text: String) {
+        if (gatt == null || writeChar == null || _state.value != ConnState.CONNECTED) {
+            _toast.value = "Not connected"; return
+        }
+        if (performWrite(text)) appendLog("TX: $text") else appendLog(">> Write failed")
     }
 
     fun clearLog() { _log.value = "" }

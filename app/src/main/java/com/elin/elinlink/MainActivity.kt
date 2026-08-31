@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
@@ -13,6 +14,7 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
+import android.widget.SeekBar
 import android.widget.Space
 import android.widget.Spinner
 import android.widget.TextView
@@ -22,6 +24,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SwitchCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -77,6 +80,8 @@ class MainActivity : AppCompatActivity() {
         }
         binding.btnAddBar.setOnClickListener { showGaugeConfig(GaugeType.BAR, null) }
         binding.btnAddMeter.setOnClickListener { showGaugeConfig(GaugeType.METER, null) }
+        binding.btnAddSlider.setOnClickListener { showControlConfig(ControlType.SLIDER, null) }
+        binding.btnAddSwitch.setOnClickListener { showControlConfig(ControlType.SWITCH, null) }
         binding.btnToggleControls.setOnClickListener {
             val visible = binding.controlsBox.visibility == View.VISIBLE
             binding.controlsBox.visibility = if (visible) View.GONE else View.VISIBLE
@@ -125,10 +130,11 @@ class MainActivity : AppCompatActivity() {
             \u2022 The status line shows Idle / Scanning / Connecting / Connected.
 
             DASHBOARD
-            \u2022 Tap \u201c+ Bar\u201d or \u201c+ Meter\u201d to add a gauge.
-            \u2022 Each gauge has a title, unit, multiplier, bit range, colour palette, orientation, height and steps.
-            \u2022 Use the pencil to edit a gauge or the \u2715 to remove it.
-            \u2022 Incoming hex frames (comma or space separated) drive the gauges live.
+            \u2022 Tap \u201c+ Bar\u201d or \u201c+ Meter\u201d to add a gauge that shows incoming data.
+            \u2022 Tap \u201c+ Slider\u201d or \u201c+ Switch\u201d to add a control that sends data.
+            \u2022 Each item has a title, bit range, orientation and height (gauges add unit, multiplier, palette, steps; sliders add steps).
+            \u2022 Use the pencil to edit an item or the \u2715 to remove it.
+            \u2022 Incoming hex frames drive the gauges; moving a slider or flipping a switch sends a hex frame (e.g. 0xD0, 0xD1).
             \u2022 Use (\u2212) / (+) in the header to hide or show the controls.
 
             TERMINAL
@@ -169,6 +175,7 @@ class MainActivity : AppCompatActivity() {
                 launch { vm.connectedName.collect { renderConnected(it) } }
                 launch { vm.gauges.collect { renderGauges(it) } }
                 launch { vm.frame.collect { updateGaugeValues(it) } }
+                launch { vm.controls.collect { renderControls(it) } }
                 launch {
                     vm.state.collect { st ->
                         binding.tvStatus.text = when (st) {
@@ -372,6 +379,199 @@ class MainActivity : AppCompatActivity() {
                         GaugeConfig.new(
                             type, title, unit, multiplier,
                             bitStart, bitEnd, orientation, heightDp, steps, palette
+                        )
+                    )
+                }
+            }
+            .show()
+    }
+
+    // ---------- Output controls (slider / switch senders) ----------
+    private fun renderControls(list: List<ControlConfig>) {
+        binding.controlsContainer.removeAllViews()
+        binding.tvControlsHeader.visibility = if (list.isEmpty()) View.GONE else View.VISIBLE
+
+        val cols = (resources.configuration.screenWidthDp / 200).coerceIn(1, 4)
+        val margin = (4 * resources.displayMetrics.density).toInt()
+        var row: LinearLayout? = null
+
+        list.forEachIndexed { index, cfg ->
+            if (index % cols == 0) {
+                val newRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                binding.controlsContainer.addView(
+                    newRow,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                )
+                row = newRow
+            }
+            val currentRow = row ?: return@forEachIndexed
+            val card = layoutInflater.inflate(R.layout.item_control_card, currentRow, false)
+            card.findViewById<TextView>(R.id.tvControlTitle).text = cfg.title
+            card.findViewById<View>(R.id.btnEditControl).setOnClickListener { showControlConfig(cfg.type, cfg) }
+            card.findViewById<View>(R.id.btnDeleteControl).setOnClickListener { vm.removeControl(cfg.id) }
+            val label = card.findViewById<TextView>(R.id.tvControlValue)
+            val holder = card.findViewById<FrameLayout>(R.id.controlHolder)
+            val hPx = (cfg.heightDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            val hp = holder.layoutParams
+            hp.height = hPx
+            holder.layoutParams = hp
+            val raw0 = vm.currentControlValue(cfg.id)
+            if (cfg.type == ControlType.SLIDER) buildSlider(cfg, holder, label, raw0, hPx)
+            else buildSwitch(cfg, holder, label, raw0)
+
+            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            lp.setMargins(margin, margin, margin, margin)
+            currentRow.addView(card, lp)
+        }
+
+        val remainder = list.size % cols
+        val lastRow = row
+        if (remainder != 0 && lastRow != null) {
+            repeat(cols - remainder) {
+                lastRow.addView(Space(this), LinearLayout.LayoutParams(0, 1, 1f))
+            }
+        }
+    }
+
+    /** Slider: sends a value 0..(2^bits - 1) quantised into [steps] increments. */
+    private fun buildSlider(
+        cfg: ControlConfig,
+        holder: FrameLayout,
+        label: TextView,
+        raw0: Long,
+        hPx: Int
+    ) {
+        val steps = cfg.steps.coerceIn(1, 1000)
+        val rawMax = cfg.rawMax
+        val seek = SeekBar(this)
+        seek.max = steps
+        seek.progress =
+            if (rawMax > 0) Math.round(raw0.toDouble() / rawMax * steps).toInt() else 0
+        label.text = raw0.toString()
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                val raw = if (steps > 0) Math.round(progress.toDouble() / steps * rawMax) else 0L
+                label.text = raw.toString()
+                vm.setControlValue(cfg.id, raw)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        if (cfg.orientation == GaugeOrientation.VERTICAL) {
+            // A horizontal SeekBar whose length equals the holder height, rotated upright.
+            seek.layoutParams = FrameLayout.LayoutParams(
+                hPx, FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.CENTER }
+            seek.rotation = 270f
+            holder.addView(seek)
+        } else {
+            holder.addView(
+                seek,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                ).apply { gravity = Gravity.CENTER }
+            )
+        }
+    }
+
+    /** Switch: sends all-ones across its bit range when ON, zero when OFF. */
+    private fun buildSwitch(
+        cfg: ControlConfig,
+        holder: FrameLayout,
+        label: TextView,
+        raw0: Long
+    ) {
+        val sw = SwitchCompat(this)
+        val on0 = raw0 != 0L
+        sw.isChecked = on0
+        label.text = if (on0) "ON" else "OFF"
+        sw.setOnCheckedChangeListener { _, checked ->
+            label.text = if (checked) "ON" else "OFF"
+            vm.setControlValue(cfg.id, if (checked) cfg.rawMax else 0L)
+        }
+        if (cfg.orientation == GaugeOrientation.VERTICAL) sw.rotation = 270f
+        holder.addView(
+            sw,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            ).apply { gravity = Gravity.CENTER }
+        )
+    }
+
+    /** Add/edit dialog for an output control. Steps are hidden for switches. */
+    private fun showControlConfig(type: ControlType, existing: ControlConfig?) {
+        val view = layoutInflater.inflate(R.layout.dialog_control_config, null)
+        val etTitle = view.findViewById<EditText>(R.id.ctlTitle)
+        val etBitStart = view.findViewById<EditText>(R.id.ctlBitStart)
+        val etBitEnd = view.findViewById<EditText>(R.id.ctlBitEnd)
+        val rbHorizontal = view.findViewById<RadioButton>(R.id.ctlRbHorizontal)
+        val rbVertical = view.findViewById<RadioButton>(R.id.ctlRbVertical)
+        val stepsLabel = view.findViewById<TextView>(R.id.ctlStepsLabel)
+        val etSteps = view.findViewById<EditText>(R.id.ctlSteps)
+        val etHeight = view.findViewById<EditText>(R.id.ctlHeight)
+
+        val isSwitch = type == ControlType.SWITCH
+        stepsLabel.visibility = if (isSwitch) View.GONE else View.VISIBLE
+        etSteps.visibility = if (isSwitch) View.GONE else View.VISIBLE
+
+        if (existing != null) {
+            etTitle.setText(existing.title)
+            etBitStart.setText(existing.bitStart.toString())
+            etBitEnd.setText(existing.bitEnd.toString())
+            if (existing.orientation == GaugeOrientation.VERTICAL) rbVertical.isChecked = true
+            else rbHorizontal.isChecked = true
+            etSteps.setText(existing.steps.toString())
+            etHeight.setText(existing.heightDp.toString())
+        } else {
+            etBitStart.setText("0")
+            etBitEnd.setText(if (isSwitch) "0" else "7")
+            etSteps.setText("10")
+            etHeight.setText("60")
+        }
+
+        val editing = existing != null
+        val dialogTitle = when {
+            editing && isSwitch -> "Edit Switch"
+            editing -> "Edit Slider"
+            isSwitch -> "Add Switch"
+            else -> "Add Slider"
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(dialogTitle)
+            .setView(view)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton(if (editing) "Save" else "Add") { _, _ ->
+                val orientation =
+                    if (rbVertical.isChecked) GaugeOrientation.VERTICAL else GaugeOrientation.HORIZONTAL
+                val title = etTitle.text?.toString()?.trim().orEmpty()
+                    .ifEmpty { if (isSwitch) "Switch" else "Slider" }
+                val bitStart = etBitStart.text?.toString()?.toIntOrNull() ?: 0
+                val bitEnd = etBitEnd.text?.toString()?.toIntOrNull() ?: (if (isSwitch) 0 else 7)
+                val heightDp = etHeight.text?.toString()?.toIntOrNull() ?: 60
+                val steps = etSteps.text?.toString()?.toIntOrNull() ?: 10
+
+                if (existing != null) {
+                    vm.updateControl(
+                        existing.copy(
+                            title = title,
+                            bitStart = bitStart,
+                            bitEnd = bitEnd,
+                            orientation = orientation,
+                            heightDp = heightDp,
+                            steps = steps
+                        )
+                    )
+                } else {
+                    vm.addControl(
+                        ControlConfig.new(
+                            type, title, bitStart, bitEnd, orientation, heightDp, steps
                         )
                     )
                 }
