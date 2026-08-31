@@ -8,75 +8,97 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:background="@color/brand"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="14dp">
 
             <TextView
-                android:id="@+id/tvStatus"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:textStyle="bold"
-                android:textSize="16sp"
-                android:text="@string/status_idle" />
+                android:textSize="18sp"
+                android:textColor="@color/white"
+                android:text="@string/app_name" />
 
             <ProgressBar
                 android:id="@+id/progress"
                 style="?android:attr/progressBarStyleSmall"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:indeterminateTint="@color/white"
                 android:visibility="gone" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btnScan"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="@string/scan" />
-
-        <TextView
-            android:id="@+id/lblDevices"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/devices"
-            android:textStyle="bold" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rvDevices"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="4dp"
-            android:background="@color/list_bg" />
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:text="@string/status_idle" />
+
+            <Button
+                android:id="@+id/btnScan"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/scan" />
+
+            <TextView
+                android:id="@+id/lblDevices"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="@string/devices"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvDevices"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="4dp"
+                android:background="@color/list_bg" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- ===== Screen 1: Dashboard (main) ===== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:background="@color/brand"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp">
 
             <TextView
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
                 android:textStyle="bold"
-                android:textSize="16sp"
+                android:textSize="18sp"
+                android:textColor="@color/white"
                 android:text="@string/dashboard" />
 
             <Button
@@ -87,123 +109,135 @@
                 android:minWidth="44dp"
                 android:textSize="22sp"
                 android:textStyle="bold"
+                android:textColor="@color/white"
                 android:text="\u2212" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/controlsBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <TextView
-                android:id="@+id/tvConnected"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textStyle="bold"
-                android:textSize="15sp"
-                android:textColor="#4CAF50" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="6dp">
-
-                <Button
-                    android:id="@+id/btnAddBar"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="@string/add_bar" />
-
-                <Button
-                    android:id="@+id/btnAddMeter"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/add_meter" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="6dp">
-
-                <Button
-                    android:id="@+id/btnTerminal"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="@string/terminal" />
-
-                <Button
-                    android:id="@+id/btnDisconnect"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="@string/disconnect" />
-            </LinearLayout>
-
-            <Button
-                android:id="@+id/btnTheme"
-                style="?attr/borderlessButtonStyle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="@string/theme" />
-        </LinearLayout>
-
-        <ScrollView
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="8dp">
+            android:orientation="vertical"
+            android:padding="12dp">
 
-            <FrameLayout
+            <LinearLayout
+                android:id="@+id/controlsBox"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <LinearLayout
-                    android:id="@+id/dashboardContainer"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/tvEmptyDash"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/tvConnected"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:layout_marginTop="48dp"
-                    android:gravity="center"
-                    android:textColor="#888888"
-                    android:text="@string/empty_dashboard" />
-            </FrameLayout>
-        </ScrollView>
+                    android:textStyle="bold"
+                    android:textSize="15sp"
+                    android:textColor="#4CAF50" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="6dp">
+
+                    <Button
+                        android:id="@+id/btnAddBar"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/add_bar" />
+
+                    <Button
+                        android:id="@+id/btnAddMeter"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/add_meter" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="6dp">
+
+                    <Button
+                        android:id="@+id/btnTerminal"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/terminal" />
+
+                    <Button
+                        android:id="@+id/btnDisconnect"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/disconnect" />
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/btnTheme"
+                    style="?attr/borderlessButtonStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/theme" />
+            </LinearLayout>
+
+            <ScrollView
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginTop="8dp">
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:id="@+id/dashboardContainer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical" />
+
+                    <TextView
+                        android:id="@+id/tvEmptyDash"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:layout_marginTop="48dp"
+                        android:gravity="center"
+                        android:textColor="#888888"
+                        android:text="@string/empty_dashboard" />
+                </FrameLayout>
+            </ScrollView>
+        </LinearLayout>
     </LinearLayout>
 
     <!-- ===== Screen 2: Serial terminal ===== -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:padding="12dp">
+        android:orientation="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:background="@color/brand"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp">
 
             <Button
                 android:id="@+id/btnBackToDash"
                 style="?attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="@color/white"
                 android:text="@string/dashboard" />
 
             <TextView
@@ -212,6 +246,8 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:textStyle="bold"
+                android:textSize="18sp"
+                android:textColor="@color/white"
                 android:text="@string/serial_terminal" />
 
             <Button
@@ -219,52 +255,60 @@
                 style="?attr/borderlessButtonStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:textColor="@color/white"
                 android:text="@string/clear" />
         </LinearLayout>
 
-        <ScrollView
-            android:id="@+id/logScroll"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:layout_marginTop="8dp"
-            android:background="#111111"
-            android:padding="8dp">
+            android:orientation="vertical"
+            android:padding="12dp">
 
-            <TextView
-                android:id="@+id/tvLog"
+            <ScrollView
+                android:id="@+id/logScroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#111111"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/tvLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:textColor="#33FF66"
+                    android:textSize="13sp"
+                    android:textIsSelectable="true" />
+            </ScrollView>
+
+            <LinearLayout
+                android:id="@+id/inputRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:textColor="#33FF66"
-                android:textSize="13sp"
-                android:textIsSelectable="true" />
-        </ScrollView>
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
 
-        <LinearLayout
-            android:id="@+id/inputRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginTop="8dp">
+                <EditText
+                    android:id="@+id/etCommand"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/command_hint"
+                    android:imeOptions="actionSend"
+                    android:inputType="text"
+                    android:maxLines="1"
+                    android:autofillHints="" />
 
-            <EditText
-                android:id="@+id/etCommand"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:hint="@string/command_hint"
-                android:imeOptions="actionSend"
-                android:inputType="text"
-                android:maxLines="1"
-                android:autofillHints="" />
-
-            <Button
-                android:id="@+id/btnSend"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:text="@string/send" />
+                <Button
+                    android:id="@+id/btnSend"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="@string/send" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 

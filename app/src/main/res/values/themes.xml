@@ -1,5 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- DayNight so the app supports both light and dark modes. Accent is kept #8B1E2D in both. -->
+    <!-- DayNight so the app supports both light and dark modes. Accent #8B1E2D is applied
+         app-wide (bars, buttons, and control tints) and kept identical in both modes. -->
     <style name="Theme.ElinLink" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand</item>
         <item name="colorOnPrimary">@color/white</item>
@@ -7,6 +8,16 @@
         <item name="colorOnPrimaryContainer">@color/white</item>
         <item name="colorSecondary">@color/brand</item>
         <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/brand</item>
+        <item name="colorOnSecondaryContainer">@color/white</item>
+
+        <!-- Tint interactive controls (radio buttons, spinner arrow, text-field focus, cursor). -->
+        <item name="colorAccent">@color/brand</item>
+        <item name="colorControlActivated">@color/brand</item>
+        <item name="android:colorControlActivated">@color/brand</item>
+
+        <!-- System bars follow the accent. -->
         <item name="android:statusBarColor">@color/brand</item>
+        <item name="android:navigationBarColor">@color/brand</item>
     </style>
 </resources>
