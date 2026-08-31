@@ -82,13 +82,14 @@ class MainActivity : AppCompatActivity() {
             binding.controlsBox.visibility = if (visible) View.GONE else View.VISIBLE
             binding.btnToggleControls.text = if (visible) "+" else "\u2212"
         }
-        updateThemeButton()
+        setThemeIcon()
         binding.btnTheme.setOnClickListener {
             val dark = !ThemeManager.isDark(this)
             ThemeManager.setDark(this, dark)
             // Applying the night mode recreates this activity so the new theme takes effect.
             ThemeManager.apply(dark)
         }
+        binding.btnHelp.setOnClickListener { showHelpDialog() }
         binding.etCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendCurrentText(); true } else false
         }
@@ -104,8 +105,46 @@ class MainActivity : AppCompatActivity() {
         observeState()
     }
 
-    private fun updateThemeButton() {
-        binding.btnTheme.text = if (ThemeManager.isDark(this)) "Theme: Dark" else "Theme: Light"
+    /** Show a moon in dark mode and a sun in light mode. */
+    private fun setThemeIcon() {
+        binding.btnTheme.setImageResource(
+            if (ThemeManager.isDark(this)) R.drawable.ic_theme_moon else R.drawable.ic_theme_sun
+        )
+    }
+
+    private fun showHelpDialog() {
+        val version = try {
+            packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+        } catch (_: Exception) { "" }
+
+        val guide = """
+            Elin-Link is a Bluetooth LE serial terminal and live dashboard for devices that use the Nordic UART Service (NUS).
+
+            CONNECT
+            \u2022 Tap Scan, then pick your device from the list.
+            \u2022 The status line shows Idle / Scanning / Connecting / Connected.
+
+            DASHBOARD
+            \u2022 Tap \u201c+ Bar\u201d or \u201c+ Meter\u201d to add a gauge.
+            \u2022 Each gauge has a title, unit, multiplier, bit range, colour palette, orientation, height and steps.
+            \u2022 Use the pencil to edit a gauge or the \u2715 to remove it.
+            \u2022 Incoming hex frames (comma or space separated) drive the gauges live.
+            \u2022 Use (\u2212) / (+) in the header to hide or show the controls.
+
+            TERMINAL
+            \u2022 Tap Terminal to see the raw serial log and send commands.
+
+            THEME
+            \u2022 Tap the sun / moon icon to switch between light and dark (default dark).
+        """.trimIndent()
+
+        val message = guide + "\n\nVersion " + version + "\nDeveloped by Ajeet"
+
+        AlertDialog.Builder(this)
+            .setTitle("Usage guide")
+            .setMessage(message)
+            .setPositiveButton("Close", null)
+            .show()
     }
 
     private fun sendCurrentText() {
