@@ -8,11 +8,13 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.Space
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -80,6 +82,13 @@ class MainActivity : AppCompatActivity() {
             binding.controlsBox.visibility = if (visible) View.GONE else View.VISIBLE
             binding.btnToggleControls.text = if (visible) "+" else "\u2212"
         }
+        updateThemeButton()
+        binding.btnTheme.setOnClickListener {
+            val dark = !ThemeManager.isDark(this)
+            ThemeManager.setDark(this, dark)
+            // Applying the night mode recreates this activity so the new theme takes effect.
+            ThemeManager.apply(dark)
+        }
         binding.etCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendCurrentText(); true } else false
         }
@@ -93,6 +102,10 @@ class MainActivity : AppCompatActivity() {
         }
 
         observeState()
+    }
+
+    private fun updateThemeButton() {
+        binding.btnTheme.text = if (ThemeManager.isDark(this)) "Theme: Dark" else "Theme: Light"
     }
 
     private fun sendCurrentText() {
@@ -243,10 +256,18 @@ class MainActivity : AppCompatActivity() {
         val etMultiplier = view.findViewById<EditText>(R.id.etMultiplier)
         val etBitStart = view.findViewById<EditText>(R.id.etBitStart)
         val etBitEnd = view.findViewById<EditText>(R.id.etBitEnd)
+        val spPalette = view.findViewById<Spinner>(R.id.spPalette)
         val rbHorizontal = view.findViewById<RadioButton>(R.id.rbHorizontal)
         val rbVertical = view.findViewById<RadioButton>(R.id.rbVertical)
         val etHeight = view.findViewById<EditText>(R.id.etHeight)
         val etSteps = view.findViewById<EditText>(R.id.etSteps)
+
+        val palettes = GaugePalette.values()
+        spPalette.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            palettes.map { it.display }
+        )
 
         if (existing != null) {
             etTitle.setText(existing.title)
@@ -254,6 +275,7 @@ class MainActivity : AppCompatActivity() {
             etMultiplier.setText(existing.multiplier.toString())
             etBitStart.setText(existing.bitStart.toString())
             etBitEnd.setText(existing.bitEnd.toString())
+            spPalette.setSelection(palettes.indexOf(existing.palette).coerceAtLeast(0))
             if (existing.orientation == GaugeOrientation.VERTICAL) rbVertical.isChecked = true
             else rbHorizontal.isChecked = true
             etHeight.setText(existing.heightDp.toString())
@@ -262,6 +284,7 @@ class MainActivity : AppCompatActivity() {
             etMultiplier.setText("1")
             etBitStart.setText("0")
             etBitEnd.setText("7")
+            spPalette.setSelection(0)
             etHeight.setText(if (type == GaugeType.BAR) "90" else "170")
             etSteps.setText("10")
         }
@@ -289,6 +312,7 @@ class MainActivity : AppCompatActivity() {
                 val bitEnd = etBitEnd.text?.toString()?.toIntOrNull() ?: 7
                 val heightDp = etHeight.text?.toString()?.toIntOrNull() ?: 120
                 val steps = etSteps.text?.toString()?.toIntOrNull() ?: 10
+                val palette = palettes.getOrElse(spPalette.selectedItemPosition) { GaugePalette.BLUE_RED }
 
                 if (existing != null) {
                     vm.updateGauge(
@@ -300,14 +324,15 @@ class MainActivity : AppCompatActivity() {
                             bitEnd = bitEnd,
                             orientation = orientation,
                             heightDp = heightDp,
-                            steps = steps
+                            steps = steps,
+                            palette = palette
                         )
                     )
                 } else {
                     vm.addGauge(
                         GaugeConfig.new(
                             type, title, unit, multiplier,
-                            bitStart, bitEnd, orientation, heightDp, steps
+                            bitStart, bitEnd, orientation, heightDp, steps, palette
                         )
                     )
                 }
