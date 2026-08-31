@@ -5,12 +5,12 @@ package com.elin.elinlink
  * current values, and formats it as comma-separated hex bytes such as
  * "0xD0, 0xD1, 0xD2".
  *
- * Bit layout matches [GaugeParser.extractBits]: bit 0 = most-significant bit of
+ * Bit layout matches GaugeParser.extractBits: bit 0 = most-significant bit of
  * byte 0, MSB-first across the stream.
  */
 object ControlFrame {
 
-    /** Write [value] into the inclusive bit range [bitStart..bitEnd] of [frame]. */
+    /** Write value into the inclusive bit range bitStart..bitEnd of frame. */
     fun writeBits(frame: ByteArray, bitStart: Int, bitEnd: Int, value: Long) {
         val start = minOf(bitStart, bitEnd).coerceAtLeast(0)
         val end = maxOf(bitStart, bitEnd).coerceAtLeast(0)

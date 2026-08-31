@@ -8,8 +8,8 @@ enum class ControlType { SLIDER, SWITCH }
 /**
  * Configuration for an interactive OUTPUT control (slider or switch).
  * The control writes its current value into the inclusive bit range
- * [bitStart..bitEnd] of the outgoing frame, using the same MSB-first bit
- * layout that [GaugeParser.extractBits] reads. This makes sending the exact
+ * bitStart..bitEnd of the outgoing frame, using the same MSB-first bit
+ * layout that GaugeParser.extractBits reads. This makes sending the exact
  * inverse of receiving.
  */
 data class ControlConfig(
