@@ -3,7 +3,6 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:layout_marginBottom="10dp"
     android:background="#FAFAFA"
     android:padding="8dp">
 
@@ -18,38 +17,43 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:ellipsize="end"
             android:textStyle="bold"
-            android:textSize="14sp" />
+            android:textSize="13sp" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btnEditGauge"
-            style="?attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:textSize="18sp"
-            android:text="\uD83D\uDD8B"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_menu_edit"
             android:contentDescription="@string/edit" />
 
-        <Button
+        <ImageButton
             android:id="@+id/btnDeleteGauge"
-            style="?attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="0dp"
-            android:paddingStart="10dp"
-            android:paddingEnd="10dp"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:textColor="#C62828"
-            android:text="\u2715"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="6dp"
+            android:scaleType="fitCenter"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:contentDescription="@string/delete" />
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvGaugeValue"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:textColor="#111111" />
 
     <FrameLayout
         android:id="@+id/gaugeHolder"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp" />
 </LinearLayout>

@@ -8,10 +8,11 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.RadioButton
+import android.widget.Space
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -34,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: DeviceAdapter
 
     private val gaugeViews = LinkedHashMap<String, View>()
+    private val gaugeValueLabels = LinkedHashMap<String, TextView>()
 
     private companion object {
         const val SCREEN_CONNECT = 0
@@ -73,6 +75,11 @@ class MainActivity : AppCompatActivity() {
         }
         binding.btnAddBar.setOnClickListener { showGaugeConfig(GaugeType.BAR, null) }
         binding.btnAddMeter.setOnClickListener { showGaugeConfig(GaugeType.METER, null) }
+        binding.btnToggleControls.setOnClickListener {
+            val visible = binding.controlsBox.visibility == View.VISIBLE
+            binding.controlsBox.visibility = if (visible) View.GONE else View.VISIBLE
+            binding.btnToggleControls.text = if (visible) "+" else "\u2212"
+        }
         binding.etCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendCurrentText(); true } else false
         }
@@ -157,13 +164,32 @@ class MainActivity : AppCompatActivity() {
     private fun renderGauges(list: List<GaugeConfig>) {
         binding.dashboardContainer.removeAllViews()
         gaugeViews.clear()
+        gaugeValueLabels.clear()
         binding.tvEmptyDash.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
-        for (cfg in list) {
-            val card = layoutInflater.inflate(R.layout.item_gauge_card, binding.dashboardContainer, false)
-            card.findViewById<TextView>(R.id.tvGaugeTitle).text =
-                if (cfg.type == GaugeType.BAR) "Bar \u2022 ${cfg.title}" else "Meter \u2022 ${cfg.title}"
-            card.findViewById<Button>(R.id.btnEditGauge).setOnClickListener { showGaugeConfig(cfg.type, cfg) }
-            card.findViewById<Button>(R.id.btnDeleteGauge).setOnClickListener { vm.removeGauge(cfg.id) }
+
+        val cols = (resources.configuration.screenWidthDp / 200).coerceIn(1, 4)
+        val margin = (4 * resources.displayMetrics.density).toInt()
+        var row: LinearLayout? = null
+
+        list.forEachIndexed { index, cfg ->
+            if (index % cols == 0) {
+                val newRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                binding.dashboardContainer.addView(
+                    newRow,
+                    LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
+                )
+                row = newRow
+            }
+            val currentRow = row ?: return@forEachIndexed
+            val card = layoutInflater.inflate(R.layout.item_gauge_card, currentRow, false)
+            card.findViewById<TextView>(R.id.tvGaugeTitle).text = cfg.title
+            card.findViewById<View>(R.id.btnEditGauge).setOnClickListener { showGaugeConfig(cfg.type, cfg) }
+            card.findViewById<View>(R.id.btnDeleteGauge).setOnClickListener { vm.removeGauge(cfg.id) }
+            val label = card.findViewById<TextView>(R.id.tvGaugeValue)
+            label.text = if (cfg.unit.isNotEmpty()) "-- ${cfg.unit}" else "--"
             val holder = card.findViewById<FrameLayout>(R.id.gaugeHolder)
             val gv: View = if (cfg.type == GaugeType.BAR)
                 BarGaugeView(this).apply { configure(cfg) }
@@ -172,22 +198,42 @@ class MainActivity : AppCompatActivity() {
             val hPx = (cfg.heightDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
             holder.addView(gv, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, hPx))
             gaugeViews[cfg.id] = gv
-            binding.dashboardContainer.addView(card)
+            gaugeValueLabels[cfg.id] = label
+
+            val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            lp.setMargins(margin, margin, margin, margin)
+            currentRow.addView(card, lp)
         }
+
+        // Pad the final row so cards keep an even width.
+        val remainder = list.size % cols
+        val lastRow = row
+        if (remainder != 0 && lastRow != null) {
+            repeat(cols - remainder) {
+                lastRow.addView(Space(this), LinearLayout.LayoutParams(0, 1, 1f))
+            }
+        }
+
         updateGaugeValues(vm.frame.value)
     }
 
     private fun updateGaugeValues(frame: ByteArray?) {
         if (frame == null) return
         for (cfg in vm.gauges.value) {
-            val gv = gaugeViews[cfg.id] ?: continue
             val v = GaugeParser.valueFor(frame, cfg)
-            when (gv) {
+            when (val gv = gaugeViews[cfg.id]) {
                 is BarGaugeView -> gv.setValue(v)
                 is MeterGaugeView -> gv.setValue(v)
+                else -> {}
             }
+            gaugeValueLabels[cfg.id]?.text =
+                if (cfg.unit.isNotEmpty()) "${formatValue(v)} ${cfg.unit}" else formatValue(v)
         }
     }
+
+    private fun formatValue(v: Double): String =
+        if (v == v.toLong().toDouble()) v.toLong().toString()
+        else String.format(java.util.Locale.US, "%.2f", v)
 
     /** Show the add/edit dialog. When [existing] is non-null the dialog edits it in place. */
     private fun showGaugeConfig(type: GaugeType, existing: GaugeConfig?) {
