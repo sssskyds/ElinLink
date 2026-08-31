@@ -11,15 +11,15 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Purely graphical 180-degree analog meter with blue-yellow-red arc and needle. */
+/** Purely graphical 180-degree analog meter with a palette-driven arc and needle. */
 class MeterGaugeView(context: Context) : View(context) {
 
     private var config: GaugeConfig? = null
     private var value: Double = 0.0
 
     private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.BUTT }
-    private val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#666666") }
-    private val needlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#111111") }
+    private val tickPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#888888") }
+    private val needlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#E53935") }
 
     fun configure(c: GaugeConfig) { config = c; invalidate() }
     fun setValue(v: Double) { value = v; invalidate() }
@@ -47,7 +47,7 @@ class MeterGaugeView(context: Context) : View(context) {
         val segments = 60
         for (i in 0 until segments) {
             val f0 = i.toFloat() / segments
-            arcPaint.color = GaugeColors.colorFor(f0.toDouble())
+            arcPaint.color = GaugeColors.colorFor(f0.toDouble(), c.palette)
             canvas.drawArc(oval, startAngle + sweep * f0, sweep / segments + 0.6f, false, arcPaint)
         }
 

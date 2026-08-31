@@ -1,0 +1,9 @@
+<resources>
+    <!-- App accent (dark red) used in both light and dark themes. -->
+    <color name="brand">#8B1E2D</color>
+    <color name="brand_dark">#6E1723</color>
+
+    <!-- Light-theme surfaces. Dark equivalents live in values-night/theme_colors.xml. -->
+    <color name="card_bg">#FAFAFA</color>
+    <color name="list_bg">#F2F2F2</color>
+</resources>

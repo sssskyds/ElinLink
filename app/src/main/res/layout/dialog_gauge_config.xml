@@ -29,6 +29,9 @@
             </LinearLayout>
         </LinearLayout>
 
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Color palette" />
+        <Spinner android:id="@+id/spPalette" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:minHeight="48dp" />
+
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Orientation" />
         <RadioGroup android:id="@+id/rgOrientation" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
             <RadioButton android:id="@+id/rbHorizontal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" android:text="Horizontal" />

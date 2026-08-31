@@ -17,7 +17,8 @@ data class GaugeConfig(
     val bitEnd: Int,
     val orientation: GaugeOrientation,
     val heightDp: Int,
-    val steps: Int
+    val steps: Int,
+    val palette: GaugePalette
 ) {
     /** Number of bits selected (1..32). */
     val bitCount: Int
@@ -42,6 +43,7 @@ data class GaugeConfig(
         put("orientation", orientation.name)
         put("heightDp", heightDp)
         put("steps", steps)
+        put("palette", palette.name)
     }
 
     companion object {
@@ -54,10 +56,11 @@ data class GaugeConfig(
             bitEnd: Int,
             orientation: GaugeOrientation,
             heightDp: Int,
-            steps: Int
+            steps: Int,
+            palette: GaugePalette = GaugePalette.BLUE_RED
         ): GaugeConfig = GaugeConfig(
             UUID.randomUUID().toString(), type, title, unit, multiplier,
-            bitStart, bitEnd, orientation, heightDp, steps
+            bitStart, bitEnd, orientation, heightDp, steps, palette
         )
 
         fun fromJson(o: JSONObject): GaugeConfig = GaugeConfig(
@@ -71,7 +74,9 @@ data class GaugeConfig(
             orientation = runCatching { GaugeOrientation.valueOf(o.optString("orientation", "HORIZONTAL")) }
                 .getOrDefault(GaugeOrientation.HORIZONTAL),
             heightDp = o.optInt("heightDp", 120),
-            steps = o.optInt("steps", 10)
+            steps = o.optInt("steps", 10),
+            palette = runCatching { GaugePalette.valueOf(o.optString("palette", "BLUE_RED")) }
+                .getOrDefault(GaugePalette.BLUE_RED)
         )
     }
 }

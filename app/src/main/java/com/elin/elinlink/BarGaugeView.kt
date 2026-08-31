@@ -8,7 +8,7 @@ import android.graphics.RectF
 import android.view.View
 import kotlin.math.max
 
-/** Purely graphical bar gauge (horizontal or vertical) with blue-yellow-red fill. */
+/** Purely graphical bar gauge (horizontal or vertical) with a palette-driven fill. */
 class BarGaugeView(context: Context) : View(context) {
 
     private var config: GaugeConfig? = null
@@ -30,7 +30,7 @@ class BarGaugeView(context: Context) : View(context) {
         val pad = dp(8f)
         val maxVal = max(c.maxValue, 1e-9)
         val frac = (value / maxVal).coerceIn(0.0, 1.0)
-        fillPaint.color = GaugeColors.colorFor(frac)
+        fillPaint.color = GaugeColors.colorFor(frac, c.palette)
         tickPaint.strokeWidth = dp(1f)
         val steps = c.steps.coerceIn(1, 50)
 

@@ -20,5 +20,6 @@
     <string name="serial_terminal">Serial Terminal</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
+    <string name="theme">Theme</string>
     <string name="empty_dashboard">No gauges yet.\nTap \u201c+ Bar\u201d or \u201c+ Meter\u201d to add one.</string>
 </resources>
