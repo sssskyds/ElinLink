@@ -30,6 +30,9 @@ enum class ConnState { IDLE, SCANNING, CONNECTING, CONNECTED, DISCONNECTED }
 class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
+        // Bump this on every change so you can confirm the phone runs the latest build.
+        const val BUILD_TAG = "rev6 - RX fix + build stamp (2026-08-31)"
+
         // Nordic UART Service (NUS)
         val NUS_SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
         val NUS_RX: UUID = UUID.fromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E") // write (phone -> device)
@@ -70,6 +73,11 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
     private var writeChar: BluetoothGattCharacteristic? = null
     private var pendingNotify: BluetoothGattCharacteristic? = null
     private var scanning = false
+
+    init {
+        // Printed as the first line of the log so you can confirm which build is running.
+        appendLog(">> Elin-Link $BUILD_TAG")
+    }
 
     fun isBluetoothOn(): Boolean = btAdapter?.isEnabled == true
 
