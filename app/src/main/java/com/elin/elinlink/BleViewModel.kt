@@ -31,7 +31,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         // Bump this on every change so you can confirm the phone runs the latest build.
-        const val BUILD_TAG = "rev6 - RX fix + build stamp (2026-08-31)"
+        const val BUILD_TAG = "rev7 - version bump + RX fix (2026-08-31)"
 
         // Nordic UART Service (NUS)
         val NUS_SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
