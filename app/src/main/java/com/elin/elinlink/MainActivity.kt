@@ -6,8 +6,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -53,6 +55,16 @@ class MainActivity : AppCompatActivity() {
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendCurrentText(); true } else false
         }
 
+        // Back on the terminal screen disconnects and returns to the scan list.
+        onBackPressedDispatcher.addCallback(this) {
+            if (binding.screenFlipper.displayedChild == 1) {
+                vm.disconnect()
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+
         observeState()
     }
 
@@ -71,7 +83,7 @@ class MainActivity : AppCompatActivity() {
                     vm.log.collect {
                         binding.tvLog.text = it
                         binding.logScroll.post {
-                            binding.logScroll.fullScroll(android.view.View.FOCUS_DOWN)
+                            binding.logScroll.fullScroll(View.FOCUS_DOWN)
                         }
                     }
                 }
@@ -88,11 +100,16 @@ class MainActivity : AppCompatActivity() {
                         val connected = st == ConnState.CONNECTED
                         binding.btnSend.isEnabled = connected
                         binding.etCommand.isEnabled = connected
-                        binding.btnDisconnect.isEnabled =
-                            connected || st == ConnState.CONNECTING
+                        binding.btnDisconnect.isEnabled = connected || st == ConnState.CONNECTING
                         binding.progress.visibility =
                             if (st == ConnState.SCANNING || st == ConnState.CONNECTING)
-                                android.view.View.VISIBLE else android.view.View.GONE
+                                View.VISIBLE else View.GONE
+
+                        // Screen routing: terminal when connected, otherwise the scan list.
+                        val target = if (connected) 1 else 0
+                        if (binding.screenFlipper.displayedChild != target) {
+                            binding.screenFlipper.displayedChild = target
+                        }
                     }
                 }
                 launch {

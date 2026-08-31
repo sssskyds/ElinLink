@@ -31,7 +31,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         // Bump this on every change so you can confirm the phone runs the latest build.
-        const val BUILD_TAG = "rev7 - version bump + RX fix (2026-08-31)"
+        const val BUILD_TAG = "rev8 - split screens + RX diagnostics (2026-08-31)"
 
         // Nordic UART Service (NUS)
         val NUS_SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
@@ -302,7 +302,17 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = ConnState.CONNECTED
             _connectedName.value = initialConnectedName(g)
 
+            if (writeChar == null) appendLog(">> RX (write) characteristic not found")
             if (pendingNotify == null) appendLog(">> TX (notify) characteristic not found")
+
+            val txProps = pendingNotify?.properties ?: 0
+            appendLog(
+                ">> Services OK. TX props=0x%02X (notify=%b indicate=%b)".format(
+                    txProps,
+                    txProps and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0,
+                    txProps and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0
+                )
+            )
 
             // Critical path first: subscribe for incoming data. The device-name read
             // happens afterwards (in onDescriptorWrite) so RX never depends on it.
