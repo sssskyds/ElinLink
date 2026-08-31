@@ -14,6 +14,7 @@ import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Handler
@@ -23,6 +24,7 @@ import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import org.json.JSONArray
 import java.util.UUID
 
 enum class ConnState { IDLE, SCANNING, CONNECTING, CONNECTED, DISCONNECTED }
@@ -31,7 +33,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         // Bump this on every change so you can confirm the phone runs the latest build.
-        const val BUILD_TAG = "rev8 - split screens + RX diagnostics (2026-08-31)"
+        const val BUILD_TAG = "rev9 - gauge dashboard + terminal toggle (2026-08-31)"
 
         // Nordic UART Service (NUS)
         val NUS_SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
@@ -43,10 +45,13 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         val GAP_DEVICE_NAME: UUID = UUID.fromString("00002A00-0000-1000-8000-00805f9b34fb")
         private const val UNKNOWN = "Unknown device"
         private const val SCAN_PERIOD_MS = 12_000L
+        private const val PREFS = "elinlink_gauges"
+        private const val KEY_CONFIGS = "configs"
     }
 
     private val appCtx get() = getApplication<Application>()
     private val handler = Handler(Looper.getMainLooper())
+    private val prefs by lazy { appCtx.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }
 
     private val btManager by lazy {
         appCtx.getSystemService(BluetoothManager::class.java)
@@ -69,6 +74,14 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
     private val _toast = MutableStateFlow<String?>(null)
     val toast: StateFlow<String?> = _toast.asStateFlow()
 
+    // ---- Gauge dashboard state ----
+    private val _gauges = MutableStateFlow<List<GaugeConfig>>(emptyList())
+    val gauges: StateFlow<List<GaugeConfig>> = _gauges.asStateFlow()
+
+    // Latest hex frame parsed from incoming serial data (used to drive gauges).
+    private val _frame = MutableStateFlow<ByteArray?>(null)
+    val frame: StateFlow<ByteArray?> = _frame.asStateFlow()
+
     private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
     private var pendingNotify: BluetoothGattCharacteristic? = null
@@ -77,9 +90,46 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
     init {
         // Printed as the first line of the log so you can confirm which build is running.
         appendLog(">> Elin-Link $BUILD_TAG")
+        loadGauges()
     }
 
     fun isBluetoothOn(): Boolean = btAdapter?.isEnabled == true
+
+    // ---------- Gauges ----------
+    fun addGauge(config: GaugeConfig) {
+        _gauges.value = _gauges.value + config
+        saveGauges()
+    }
+
+    fun removeGauge(id: String) {
+        _gauges.value = _gauges.value.filterNot { it.id == id }
+        saveGauges()
+    }
+
+    private fun loadGauges() {
+        try {
+            val raw = prefs.getString(KEY_CONFIGS, "[]") ?: "[]"
+            val arr = JSONArray(raw)
+            val list = ArrayList<GaugeConfig>(arr.length())
+            for (i in 0 until arr.length()) list.add(GaugeConfig.fromJson(arr.getJSONObject(i)))
+            _gauges.value = list
+        } catch (_: Exception) {
+            _gauges.value = emptyList()
+        }
+    }
+
+    private fun saveGauges() {
+        val arr = JSONArray()
+        _gauges.value.forEach { arr.put(it.toJson()) }
+        prefs.edit().putString(KEY_CONFIGS, arr.toString()).apply()
+    }
+
+    /** Log incoming serial text and, if it is a hex frame, update the gauge data frame. */
+    private fun onSerialData(text: String) {
+        appendLog("RX: $text")
+        val f = GaugeParser.parseHex(text)
+        if (f != null) _frame.value = f
+    }
 
     private fun hasScanPerm(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
@@ -373,7 +423,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray
         ) {
-            if (characteristic.uuid == NUS_TX) appendLog("RX: " + value.toString(Charsets.UTF_8))
+            if (characteristic.uuid == NUS_TX) onSerialData(value.toString(Charsets.UTF_8))
         }
 
         // Android <= 12
@@ -387,7 +437,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
                 characteristic.uuid == NUS_TX
             ) {
                 val data = characteristic.value ?: return
-                appendLog("RX: " + data.toString(Charsets.UTF_8))
+                onSerialData(data.toString(Charsets.UTF_8))
             }
         }
     }

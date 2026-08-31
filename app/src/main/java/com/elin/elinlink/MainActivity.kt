@@ -240,3 +240,21 @@ class MainActivity : AppCompatActivity() {
         }
         if (needed.isEmpty()) startScanFlow() else permLauncher.launch(needed.toTypedArray())
     }
+
+    private fun requiredPermissions(): List<String> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+
+    private fun startScanFlow() {
+        binding.screenFlipper.displayedChild = SCREEN_CONNECT
+        vm.startScan()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        vm.stopScan()
+    }
+}
