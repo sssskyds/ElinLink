@@ -33,7 +33,7 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         // Bump this on every change so you can confirm the phone runs the latest build.
-        const val BUILD_TAG = "rev9 - gauge dashboard + terminal toggle (2026-08-31)"
+        const val BUILD_TAG = "rev10 - edit gauges + icon buttons (2026-08-31)"
 
         // Nordic UART Service (NUS)
         val NUS_SERVICE: UUID = UUID.fromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
@@ -98,6 +98,11 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- Gauges ----------
     fun addGauge(config: GaugeConfig) {
         _gauges.value = _gauges.value + config
+        saveGauges()
+    }
+
+    fun updateGauge(config: GaugeConfig) {
+        _gauges.value = _gauges.value.map { if (it.id == config.id) config else it }
         saveGauges()
     }
 

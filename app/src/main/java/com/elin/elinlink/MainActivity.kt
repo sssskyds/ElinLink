@@ -71,8 +71,8 @@ class MainActivity : AppCompatActivity() {
         binding.btnBackToDash.setOnClickListener {
             binding.screenFlipper.displayedChild = SCREEN_DASHBOARD
         }
-        binding.btnAddBar.setOnClickListener { showGaugeConfig(GaugeType.BAR) }
-        binding.btnAddMeter.setOnClickListener { showGaugeConfig(GaugeType.METER) }
+        binding.btnAddBar.setOnClickListener { showGaugeConfig(GaugeType.BAR, null) }
+        binding.btnAddMeter.setOnClickListener { showGaugeConfig(GaugeType.METER, null) }
         binding.etCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendCurrentText(); true } else false
         }
@@ -162,6 +162,7 @@ class MainActivity : AppCompatActivity() {
             val card = layoutInflater.inflate(R.layout.item_gauge_card, binding.dashboardContainer, false)
             card.findViewById<TextView>(R.id.tvGaugeTitle).text =
                 if (cfg.type == GaugeType.BAR) "Bar \u2022 ${cfg.title}" else "Meter \u2022 ${cfg.title}"
+            card.findViewById<Button>(R.id.btnEditGauge).setOnClickListener { showGaugeConfig(cfg.type, cfg) }
             card.findViewById<Button>(R.id.btnDeleteGauge).setOnClickListener { vm.removeGauge(cfg.id) }
             val holder = card.findViewById<FrameLayout>(R.id.gaugeHolder)
             val gv: View = if (cfg.type == GaugeType.BAR)
@@ -188,41 +189,82 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showGaugeConfig(type: GaugeType) {
+    /** Show the add/edit dialog. When [existing] is non-null the dialog edits it in place. */
+    private fun showGaugeConfig(type: GaugeType, existing: GaugeConfig?) {
         val view = layoutInflater.inflate(R.layout.dialog_gauge_config, null)
         val etTitle = view.findViewById<EditText>(R.id.etTitle)
         val etUnit = view.findViewById<EditText>(R.id.etUnit)
         val etMultiplier = view.findViewById<EditText>(R.id.etMultiplier)
         val etBitStart = view.findViewById<EditText>(R.id.etBitStart)
         val etBitEnd = view.findViewById<EditText>(R.id.etBitEnd)
+        val rbHorizontal = view.findViewById<RadioButton>(R.id.rbHorizontal)
         val rbVertical = view.findViewById<RadioButton>(R.id.rbVertical)
         val etHeight = view.findViewById<EditText>(R.id.etHeight)
         val etSteps = view.findViewById<EditText>(R.id.etSteps)
 
-        etMultiplier.setText("1")
-        etBitStart.setText("0")
-        etBitEnd.setText("7")
-        etHeight.setText(if (type == GaugeType.BAR) "90" else "170")
-        etSteps.setText("10")
+        if (existing != null) {
+            etTitle.setText(existing.title)
+            etUnit.setText(existing.unit)
+            etMultiplier.setText(existing.multiplier.toString())
+            etBitStart.setText(existing.bitStart.toString())
+            etBitEnd.setText(existing.bitEnd.toString())
+            if (existing.orientation == GaugeOrientation.VERTICAL) rbVertical.isChecked = true
+            else rbHorizontal.isChecked = true
+            etHeight.setText(existing.heightDp.toString())
+            etSteps.setText(existing.steps.toString())
+        } else {
+            etMultiplier.setText("1")
+            etBitStart.setText("0")
+            etBitEnd.setText("7")
+            etHeight.setText(if (type == GaugeType.BAR) "90" else "170")
+            etSteps.setText("10")
+        }
+
+        val editing = existing != null
+        val dialogTitle = when {
+            editing && type == GaugeType.BAR -> "Edit Bar"
+            editing -> "Edit Meter"
+            type == GaugeType.BAR -> "Add Bar"
+            else -> "Add Meter"
+        }
 
         AlertDialog.Builder(this)
-            .setTitle(if (type == GaugeType.BAR) "Add Bar" else "Add Meter")
+            .setTitle(dialogTitle)
             .setView(view)
             .setNegativeButton("Cancel", null)
-            .setPositiveButton("Add") { _, _ ->
-                val cfg = GaugeConfig.new(
-                    type = type,
-                    title = etTitle.text?.toString()?.trim().orEmpty()
-                        .ifEmpty { if (type == GaugeType.BAR) "Bar" else "Meter" },
-                    unit = etUnit.text?.toString()?.trim().orEmpty(),
-                    multiplier = etMultiplier.text?.toString()?.toDoubleOrNull() ?: 1.0,
-                    bitStart = etBitStart.text?.toString()?.toIntOrNull() ?: 0,
-                    bitEnd = etBitEnd.text?.toString()?.toIntOrNull() ?: 7,
-                    orientation = if (rbVertical.isChecked) GaugeOrientation.VERTICAL else GaugeOrientation.HORIZONTAL,
-                    heightDp = etHeight.text?.toString()?.toIntOrNull() ?: 120,
-                    steps = etSteps.text?.toString()?.toIntOrNull() ?: 10
-                )
-                vm.addGauge(cfg)
+            .setPositiveButton(if (editing) "Save" else "Add") { _, _ ->
+                val orientation =
+                    if (rbVertical.isChecked) GaugeOrientation.VERTICAL else GaugeOrientation.HORIZONTAL
+                val title = etTitle.text?.toString()?.trim().orEmpty()
+                    .ifEmpty { if (type == GaugeType.BAR) "Bar" else "Meter" }
+                val unit = etUnit.text?.toString()?.trim().orEmpty()
+                val multiplier = etMultiplier.text?.toString()?.toDoubleOrNull() ?: 1.0
+                val bitStart = etBitStart.text?.toString()?.toIntOrNull() ?: 0
+                val bitEnd = etBitEnd.text?.toString()?.toIntOrNull() ?: 7
+                val heightDp = etHeight.text?.toString()?.toIntOrNull() ?: 120
+                val steps = etSteps.text?.toString()?.toIntOrNull() ?: 10
+
+                if (existing != null) {
+                    vm.updateGauge(
+                        existing.copy(
+                            title = title,
+                            unit = unit,
+                            multiplier = multiplier,
+                            bitStart = bitStart,
+                            bitEnd = bitEnd,
+                            orientation = orientation,
+                            heightDp = heightDp,
+                            steps = steps
+                        )
+                    )
+                } else {
+                    vm.addGauge(
+                        GaugeConfig.new(
+                            type, title, unit, multiplier,
+                            bitStart, bitEnd, orientation, heightDp, steps
+                        )
+                    )
+                }
             }
             .show()
     }
