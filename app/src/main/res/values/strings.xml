@@ -13,4 +13,11 @@
     <string name="status_connecting">Status: Connecting\u2026</string>
     <string name="status_connected">Status: Connected</string>
     <string name="status_disconnected">Status: Disconnected</string>
+    <string name="add_bar">+ Bar</string>
+    <string name="add_meter">+ Meter</string>
+    <string name="terminal">Terminal</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="serial_terminal">Serial Terminal</string>
+    <string name="delete">Delete</string>
+    <string name="empty_dashboard">No gauges yet.\nTap \u201c+ Bar\u201d or \u201c+ Meter\u201d to add one.</string>
 </resources>

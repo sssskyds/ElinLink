@@ -8,10 +8,16 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.RadioButton
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -26,6 +32,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val vm: BleViewModel by viewModels()
     private lateinit var adapter: DeviceAdapter
+
+    private val gaugeViews = LinkedHashMap<String, View>()
+
+    private companion object {
+        const val SCREEN_CONNECT = 0
+        const val SCREEN_DASHBOARD = 1
+        const val SCREEN_TERMINAL = 2
+    }
 
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -51,17 +65,23 @@ class MainActivity : AppCompatActivity() {
         binding.btnDisconnect.setOnClickListener { vm.disconnect() }
         binding.btnSend.setOnClickListener { sendCurrentText() }
         binding.btnClear.setOnClickListener { vm.clearLog() }
+        binding.btnTerminal.setOnClickListener {
+            binding.screenFlipper.displayedChild = SCREEN_TERMINAL
+        }
+        binding.btnBackToDash.setOnClickListener {
+            binding.screenFlipper.displayedChild = SCREEN_DASHBOARD
+        }
+        binding.btnAddBar.setOnClickListener { showGaugeConfig(GaugeType.BAR) }
+        binding.btnAddMeter.setOnClickListener { showGaugeConfig(GaugeType.METER) }
         binding.etCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) { sendCurrentText(); true } else false
         }
 
-        // Back on the terminal screen disconnects and returns to the scan list.
         onBackPressedDispatcher.addCallback(this) {
-            if (binding.screenFlipper.displayedChild == 1) {
-                vm.disconnect()
-            } else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+            when (binding.screenFlipper.displayedChild) {
+                SCREEN_TERMINAL -> binding.screenFlipper.displayedChild = SCREEN_DASHBOARD
+                SCREEN_DASHBOARD -> vm.disconnect()
+                else -> { isEnabled = false; onBackPressedDispatcher.onBackPressed() }
             }
         }
 
@@ -88,6 +108,8 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 launch { vm.connectedName.collect { renderConnected(it) } }
+                launch { vm.gauges.collect { renderGauges(it) } }
+                launch { vm.frame.collect { updateGaugeValues(it) } }
                 launch {
                     vm.state.collect { st ->
                         binding.tvStatus.text = when (st) {
@@ -100,15 +122,17 @@ class MainActivity : AppCompatActivity() {
                         val connected = st == ConnState.CONNECTED
                         binding.btnSend.isEnabled = connected
                         binding.etCommand.isEnabled = connected
-                        binding.btnDisconnect.isEnabled = connected || st == ConnState.CONNECTING
+                        binding.btnDisconnect.isEnabled = connected
                         binding.progress.visibility =
                             if (st == ConnState.SCANNING || st == ConnState.CONNECTING)
                                 View.VISIBLE else View.GONE
 
-                        // Screen routing: terminal when connected, otherwise the scan list.
-                        val target = if (connected) 1 else 0
-                        if (binding.screenFlipper.displayedChild != target) {
-                            binding.screenFlipper.displayedChild = target
+                        if (connected) {
+                            if (binding.screenFlipper.displayedChild == SCREEN_CONNECT) {
+                                binding.screenFlipper.displayedChild = SCREEN_DASHBOARD
+                            }
+                        } else {
+                            binding.screenFlipper.displayedChild = SCREEN_CONNECT
                         }
                     }
                 }
@@ -129,6 +153,81 @@ class MainActivity : AppCompatActivity() {
             if (name != null) getString(R.string.connected_to, name) else ""
     }
 
+    // ---------- Dashboard / gauges ----------
+    private fun renderGauges(list: List<GaugeConfig>) {
+        binding.dashboardContainer.removeAllViews()
+        gaugeViews.clear()
+        binding.tvEmptyDash.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+        for (cfg in list) {
+            val card = layoutInflater.inflate(R.layout.item_gauge_card, binding.dashboardContainer, false)
+            card.findViewById<TextView>(R.id.tvGaugeTitle).text =
+                if (cfg.type == GaugeType.BAR) "Bar \u2022 ${cfg.title}" else "Meter \u2022 ${cfg.title}"
+            card.findViewById<Button>(R.id.btnDeleteGauge).setOnClickListener { vm.removeGauge(cfg.id) }
+            val holder = card.findViewById<FrameLayout>(R.id.gaugeHolder)
+            val gv: View = if (cfg.type == GaugeType.BAR)
+                BarGaugeView(this).apply { configure(cfg) }
+            else
+                MeterGaugeView(this).apply { configure(cfg) }
+            val hPx = (cfg.heightDp * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+            holder.addView(gv, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, hPx))
+            gaugeViews[cfg.id] = gv
+            binding.dashboardContainer.addView(card)
+        }
+        updateGaugeValues(vm.frame.value)
+    }
+
+    private fun updateGaugeValues(frame: ByteArray?) {
+        if (frame == null) return
+        for (cfg in vm.gauges.value) {
+            val gv = gaugeViews[cfg.id] ?: continue
+            val v = GaugeParser.valueFor(frame, cfg)
+            when (gv) {
+                is BarGaugeView -> gv.setValue(v)
+                is MeterGaugeView -> gv.setValue(v)
+            }
+        }
+    }
+
+    private fun showGaugeConfig(type: GaugeType) {
+        val view = layoutInflater.inflate(R.layout.dialog_gauge_config, null)
+        val etTitle = view.findViewById<EditText>(R.id.etTitle)
+        val etUnit = view.findViewById<EditText>(R.id.etUnit)
+        val etMultiplier = view.findViewById<EditText>(R.id.etMultiplier)
+        val etBitStart = view.findViewById<EditText>(R.id.etBitStart)
+        val etBitEnd = view.findViewById<EditText>(R.id.etBitEnd)
+        val rbVertical = view.findViewById<RadioButton>(R.id.rbVertical)
+        val etHeight = view.findViewById<EditText>(R.id.etHeight)
+        val etSteps = view.findViewById<EditText>(R.id.etSteps)
+
+        etMultiplier.setText("1")
+        etBitStart.setText("0")
+        etBitEnd.setText("7")
+        etHeight.setText(if (type == GaugeType.BAR) "90" else "170")
+        etSteps.setText("10")
+
+        AlertDialog.Builder(this)
+            .setTitle(if (type == GaugeType.BAR) "Add Bar" else "Add Meter")
+            .setView(view)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Add") { _, _ ->
+                val cfg = GaugeConfig.new(
+                    type = type,
+                    title = etTitle.text?.toString()?.trim().orEmpty()
+                        .ifEmpty { if (type == GaugeType.BAR) "Bar" else "Meter" },
+                    unit = etUnit.text?.toString()?.trim().orEmpty(),
+                    multiplier = etMultiplier.text?.toString()?.toDoubleOrNull() ?: 1.0,
+                    bitStart = etBitStart.text?.toString()?.toIntOrNull() ?: 0,
+                    bitEnd = etBitEnd.text?.toString()?.toIntOrNull() ?: 7,
+                    orientation = if (rbVertical.isChecked) GaugeOrientation.VERTICAL else GaugeOrientation.HORIZONTAL,
+                    heightDp = etHeight.text?.toString()?.toIntOrNull() ?: 120,
+                    steps = etSteps.text?.toString()?.toIntOrNull() ?: 10
+                )
+                vm.addGauge(cfg)
+            }
+            .show()
+    }
+
+    // ---------- BLE flow ----------
     private fun ensureBluetoothThenScan() {
         if (!vm.isBluetoothOn()) {
             enableBtLauncher.launch(Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE))
@@ -141,18 +240,3 @@ class MainActivity : AppCompatActivity() {
         }
         if (needed.isEmpty()) startScanFlow() else permLauncher.launch(needed.toTypedArray())
     }
-
-    private fun requiredPermissions(): List<String> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
-        } else {
-            listOf(Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-
-    private fun startScanFlow() = vm.startScan()
-
-    override fun onStop() {
-        super.onStop()
-        vm.stopScan()
-    }
-}
