@@ -11,8 +11,8 @@ android {
         applicationId "com.elin.elinlink"
         minSdk 21
         targetSdk 34
-        versionCode 9
-        versionName "1.8-rev14"
+        versionCode 10
+        versionName "1.9-rev15"
     }
 
     buildTypes {

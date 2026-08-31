@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Title" />
+        <EditText android:id="@+id/ctlTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="text" android:maxLines="1" android:autofillHints="" />
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="8dp">
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bit start" />
+                <EditText android:id="@+id/ctlBitStart" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:maxLines="1" android:autofillHints="" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginStart="8dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Bit end" />
+                <EditText android:id="@+id/ctlBitEnd" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:maxLines="1" android:autofillHints="" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Orientation" />
+        <RadioGroup android:id="@+id/ctlRgOrientation" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+            <RadioButton android:id="@+id/ctlRbHorizontal" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" android:text="Horizontal" />
+            <RadioButton android:id="@+id/ctlRbVertical" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="16dp" android:text="Vertical" />
+        </RadioGroup>
+
+        <TextView android:id="@+id/ctlStepsLabel" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Steps" />
+        <EditText android:id="@+id/ctlSteps" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:maxLines="1" android:autofillHints="" />
+
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Height (dp)" />
+        <EditText android:id="@+id/ctlHeight" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:maxLines="1" android:autofillHints="" />
+    </LinearLayout>
+</ScrollView>
