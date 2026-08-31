@@ -194,22 +194,47 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         _connectedName.value = null
     }
 
+    /**
+     * Enable notifications/indications on the NUS TX characteristic.
+     * Returns true if a CCCD descriptor write was issued (completion arrives in
+     * onDescriptorWrite); false if there was nothing to write.
+     */
     @SuppressLint("MissingPermission")
-    private fun enableNotifications(g: BluetoothGatt) {
-        val notifyChar = pendingNotify ?: return
-        g.setCharacteristicNotification(notifyChar, true)
+    private fun enableNotifications(g: BluetoothGatt): Boolean {
+        val notifyChar = pendingNotify ?: return false
+        val enabled = g.setCharacteristicNotification(notifyChar, true)
+        if (!enabled) appendLog(">> setCharacteristicNotification returned false")
+
+        val props = notifyChar.properties
+        val cccdValue = when {
+            props and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0 ->
+                BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            props and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0 ->
+                BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+            else -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        }
+
         val cccd = notifyChar.getDescriptor(CCCD)
-        if (cccd != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                g.writeDescriptor(cccd, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-            } else {
-                @Suppress("DEPRECATION")
-                cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+        if (cccd == null) {
+            appendLog(">> TX characteristic has no CCCD (0x2902); cannot subscribe")
+            return false
+        }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            g.writeDescriptor(cccd, cccdValue) == BluetoothGatt.GATT_SUCCESS
+        } else {
+            @Suppress("DEPRECATION")
+            run {
+                cccd.value = cccdValue
                 @Suppress("DEPRECATION")
                 g.writeDescriptor(cccd)
             }
         }
-        appendLog(">> Ready. Notifications enabled.")
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun readGapName(g: BluetoothGatt) {
+        val gapName = g.getService(GAP_SERVICE)?.getCharacteristic(GAP_DEVICE_NAME) ?: return
+        g.readCharacteristic(gapName)
     }
 
     @SuppressLint("MissingPermission")
@@ -269,15 +294,28 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = ConnState.CONNECTED
             _connectedName.value = initialConnectedName(g)
 
-            // If the device exposes the standard Device Name characteristic, read it so
-            // peripherals that don't advertise a name still show a real name.
-            val gapName = g.getService(GAP_SERVICE)?.getCharacteristic(GAP_DEVICE_NAME)
-            if (gapName != null) {
-                // Read first; notifications are enabled in onCharacteristicRead so the
-                // two GATT operations are serialized (Android allows only one at a time).
-                g.readCharacteristic(gapName)
-            } else {
-                enableNotifications(g)
+            if (pendingNotify == null) appendLog(">> TX (notify) characteristic not found")
+
+            // Critical path first: subscribe for incoming data. The device-name read
+            // happens afterwards (in onDescriptorWrite) so RX never depends on it.
+            val issued = enableNotifications(g)
+            if (!issued) readGapName(g)
+        }
+
+        @SuppressLint("MissingPermission")
+        override fun onDescriptorWrite(
+            g: BluetoothGatt,
+            descriptor: BluetoothGattDescriptor,
+            status: Int
+        ) {
+            if (descriptor.uuid == CCCD) {
+                if (status == BluetoothGatt.GATT_SUCCESS) {
+                    appendLog(">> Ready. Notifications enabled.")
+                } else {
+                    appendLog(">> Failed to enable notifications (status $status)")
+                }
+                // Now that the subscribe is done, read the device name.
+                readGapName(g)
             }
         }
 
@@ -288,12 +326,9 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
             value: ByteArray,
             status: Int
         ) {
-            if (characteristic.uuid == GAP_DEVICE_NAME) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    val n = value.toString(Charsets.UTF_8).trim()
-                    if (n.isNotEmpty()) applyResolvedName(g, n)
-                }
-                enableNotifications(g)
+            if (characteristic.uuid == GAP_DEVICE_NAME && status == BluetoothGatt.GATT_SUCCESS) {
+                val n = value.toString(Charsets.UTF_8).trim()
+                if (n.isNotEmpty()) applyResolvedName(g, n)
             }
         }
 
@@ -306,13 +341,11 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
             status: Int
         ) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU &&
-                characteristic.uuid == GAP_DEVICE_NAME
+                characteristic.uuid == GAP_DEVICE_NAME &&
+                status == BluetoothGatt.GATT_SUCCESS
             ) {
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    val n = characteristic.value?.toString(Charsets.UTF_8)?.trim()
-                    if (!n.isNullOrEmpty()) applyResolvedName(g, n)
-                }
-                enableNotifications(g)
+                val n = characteristic.value?.toString(Charsets.UTF_8)?.trim()
+                if (!n.isNullOrEmpty()) applyResolvedName(g, n)
             }
         }
 
@@ -349,8 +382,12 @@ class BleViewModel(app: Application) : AndroidViewModel(app) {
         if (g == null || ch == null || _state.value != ConnState.CONNECTED) {
             _toast.value = "Not connected"; return
         }
-        val payload = (text + "\n").toByteArray(Charsets.UTF_8)
-        val writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+        val payload = (text + "\r\n").toByteArray(Charsets.UTF_8)
+        val props = ch.properties
+        val writeType = if (props and BluetoothGattCharacteristic.PROPERTY_WRITE != 0)
+            BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+        else
+            BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
         val ok = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             g.writeCharacteristic(ch, payload, writeType) == BluetoothGatt.GATT_SUCCESS
         } else {
